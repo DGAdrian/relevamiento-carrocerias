@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relevamiento de Carrocerías</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12161A;
+    --surface:#1B2127;
+    --surface2:#232A31;
+    --border:#2E363E;
+    --text:#EDEFF2;
+    --text-dim:#8C96A1;
+    --amber:#E7A33E;
+    --amber-dim:#4A3B22;
+    --green:#4FA579;
+    --green-dim:#20362C;
+    --red:#DD6355;
+    --red-dim:#3A2320;
+    --blue:#6E9BD9;
+    --blue-dim:#233245;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  #app{max-width:640px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; background:var(--bg);}
+
+  .header{
+    background:linear-gradient(180deg,#181D22,#12161A);
+    border-bottom:1px solid var(--border);
+    padding:18px 16px 0 16px;
+    position:sticky; top:0; z-index:10;
+  }
+  .header-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{
+    width:38px; height:38px; border-radius:8px;
+    background:#F3F1EC;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; padding:6px; box-sizing:border-box;
+  }
+  .brand-mark img{width:100%; height:100%; object-fit:contain; display:block;}
+  .brand-text h1{font-family:'Oswald',sans-serif; font-size:16px; letter-spacing:.3px; text-transform:uppercase; font-weight:600;}
+  .brand-text p{font-size:11px; color:var(--text-dim); margin-top:1px;}
+  .icon-btn{
+    background:var(--surface2); border:1px solid var(--border); color:var(--text-dim);
+    width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:16px; flex-shrink:0;
+  }
+  .icon-btn:hover{color:var(--text); border-color:#3C4650;}
+
+  .stats-row{display:flex; gap:8px; margin:14px 0 12px 0;}
+  .stat-card{
+    flex:1; background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:9px 10px;
+  }
+  .stat-num{font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; line-height:1;}
+  .stat-label{font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; margin-top:3px;}
+  .stat-card.pend .stat-num{color:var(--amber);}
+  .stat-card.done .stat-num{color:var(--green);}
+
+  .tabs{display:flex; gap:4px; border-bottom:1px solid var(--border);}
+  .tab{
+    flex:1; text-align:center; padding:10px 6px; font-size:13px; font-weight:600;
+    color:var(--text-dim); cursor:pointer; border-bottom:2px solid transparent;
+    font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:.4px;
+  }
+  .tab.active{color:var(--amber); border-bottom-color:var(--amber);}
+
+  .content{flex:1; padding:14px 16px 90px 16px; overflow-y:auto;}
+
+  .search-box{
+    display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border);
+    border-radius:9px; padding:9px 12px; margin-bottom:10px;
+  }
+  .search-box input{
+    background:none; border:none; outline:none; color:var(--text); font-size:14px; width:100%;
+    font-family:'Inter',sans-serif;
+  }
+  .search-box input::placeholder{color:var(--text-dim);}
+  .search-box .ico{color:var(--text-dim); font-size:14px;}
+
+  .filter-row{display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;}
+  .filter-group{display:flex; gap:5px; flex-wrap:wrap;}
+  .filter-chip{
+    font-size:11.5px; padding:6px 11px; border-radius:20px; border:1px solid var(--border);
+    color:var(--text-dim); cursor:pointer; background:var(--surface); font-weight:600;
+  }
+  .filter-chip.on{background:var(--blue-dim); border-color:#3A5678; color:var(--blue);}
+
+  .unit-item{
+    display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:11px 12px; margin-bottom:8px; cursor:pointer; transition:border-color .15s;
+  }
+  .unit-item:hover{border-color:#3C4650;}
+  .unit-chip{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px;
+    background:#0F1114; border:1px solid var(--border); color:var(--amber);
+    padding:6px 9px; border-radius:6px; letter-spacing:.5px; flex-shrink:0;
+    min-width:74px; text-align:center;
+  }
+  .unit-item.done .unit-chip{color:var(--green);}
+  .unit-meta{flex:1; min-width:0;}
+  .unit-meta .m1{font-size:12px; color:var(--text-dim); display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:3px;}
+  .unit-meta .m2{font-size:11px; color:var(--text-dim);}
+  .tag{font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:5px; background:var(--surface2); color:var(--text-dim); border:1px solid var(--border);}
+  .score-pill{font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:5px;}
+  .score-pill.s1, .score-pill.s2{background:var(--red-dim); color:var(--red);}
+  .score-pill.s3{background:var(--amber-dim); color:var(--amber);}
+  .score-pill.s4, .score-pill.s5{background:var(--green-dim); color:var(--green);}
+  .status-dot{width:8px; height:8px; border-radius:50%; background:var(--amber); flex-shrink:0;}
+  .unit-item.done .status-dot{background:var(--green);}
+  .chevron{color:var(--text-dim); font-size:16px; flex-shrink:0;}
+
+  .empty-state{text-align:center; padding:50px 20px; color:var(--text-dim);}
+  .empty-state .big{font-size:34px; margin-bottom:10px;}
+  .empty-state p{font-size:13.5px; line-height:1.5;}
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--amber); color:#20180A; border:none; border-radius:9px;
+    padding:12px 18px; font-weight:600; font-size:14px; cursor:pointer; font-family:'Inter',sans-serif;
+    width:100%;
+  }
+  .btn:hover{filter:brightness(1.06);}
+  .btn.secondary{background:var(--surface2); color:var(--text); border:1px solid var(--border);}
+  .btn.danger{background:var(--red-dim); color:var(--red); border:1px solid #5A332E;}
+  .btn.small{width:auto; padding:8px 14px; font-size:13px;}
+  .btn:disabled{opacity:.5; cursor:not-allowed;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; color:var(--text-dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:.4px; font-weight:600;}
+  .field input, .field select, .field textarea{
+    width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:10px 11px; font-size:14px; font-family:'Inter',sans-serif; outline:none;
+  }
+  .field textarea{resize:vertical; min-height:60px;}
+  .field select{appearance:none;}
+  .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--amber);}
+  .checkbox-row{display:flex; align-items:center; gap:10px; background:var(--green-dim); border:1px solid #2E5240; border-radius:9px; padding:12px; margin-bottom:16px;}
+  .checkbox-row input{width:18px; height:18px; accent-color:var(--green);}
+  .checkbox-row span{font-size:13.5px; color:var(--text);}
+
+  .score-section{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:16px;}
+  .score-section label{display:block; font-size:12px; color:var(--text-dim); margin-bottom:10px; text-transform:uppercase; letter-spacing:.4px; font-weight:600;}
+  .score-row{display:flex; gap:6px;}
+  .score-opt{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 2px; border-radius:8px; border:1px solid var(--border); cursor:pointer; background:var(--surface2);}
+  .score-opt .n{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:16px; color:var(--text-dim);}
+  .score-opt .l{font-size:9.5px; color:var(--text-dim); text-align:center; line-height:1.2;}
+  .score-opt.on{border-color:currentColor;}
+  .score-opt[data-score="1"].on, .score-opt[data-score="2"].on{background:var(--red-dim); color:var(--red);}
+  .score-opt[data-score="3"].on{background:var(--amber-dim); color:var(--amber);}
+  .score-opt[data-score="4"].on, .score-opt[data-score="5"].on{background:var(--green-dim); color:var(--green);}
+  .score-opt.on .n, .score-opt.on .l{color:inherit;}
+  input.f-score-hidden{display:none;}
+
+  .desvio-card{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:13px; margin-bottom:12px; position:relative;}
+  .desvio-card .rm{position:absolute; top:10px; right:10px; color:var(--text-dim); cursor:pointer; font-size:14px; background:none; border:none;}
+  .desvio-card .rm:hover{color:var(--red);}
+  .desvio-num{font-family:'Oswald',sans-serif; font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px;}
+
+  .sev-row{display:flex; gap:6px;}
+  .sev-opt{flex:1; text-align:center; padding:8px 4px; border-radius:7px; border:1px solid var(--border); font-size:12.5px; cursor:pointer; color:var(--text-dim);}
+  .sev-opt.sel-leve.on{background:var(--green-dim); border-color:#2E5240; color:var(--green);}
+  .sev-opt.sel-moderado.on{background:var(--amber-dim); border-color:#5A4626; color:var(--amber);}
+  .sev-opt.sel-grave.on{background:var(--red-dim); border-color:#5A332E; color:var(--red);}
+
+  .detail-header{display:flex; align-items:center; gap:12px; padding:16px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:5;}
+  .back-btn{background:var(--surface2); border:1px solid var(--border); color:var(--text); width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;}
+  .detail-title-chip{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:16px; color:var(--amber); background:#0F1114; border:1px solid var(--border); padding:6px 12px; border-radius:7px;}
+  .detail-sub{font-size:11.5px; color:var(--text-dim); margin-top:4px; display:flex; gap:6px; flex-wrap:wrap;}
+
+  .footer-bar{position:fixed; bottom:0; left:0; right:0; max-width:640px; margin:0 auto; padding:12px 16px; background:linear-gradient(180deg,rgba(18,22,26,0),var(--bg) 30%); }
+  .badge{display:inline-block; font-size:10.5px; padding:3px 8px; border-radius:5px; font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
+  .badge.leve{background:var(--green-dim); color:var(--green);}
+  .badge.moderado{background:var(--amber-dim); color:var(--amber);}
+  .badge.grave{background:var(--red-dim); color:var(--red);}
+
+  .setup-wrap{padding:24px 20px; display:flex; flex-direction:column; gap:14px; justify-content:center; min-height:100vh;}
+  .setup-wrap h2{font-family:'Oswald',sans-serif; font-size:20px; text-transform:uppercase;}
+  .setup-wrap p{font-size:13.5px; color:var(--text-dim); line-height:1.55;}
+  .setup-wrap textarea{width:100%; min-height:180px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:9px; padding:12px; font-family:'JetBrains Mono',monospace; font-size:13px; outline:none;}
+  .setup-wrap textarea:focus{border-color:var(--amber);}
+  .hint{font-size:12px; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; line-height:1.5;}
+  .hint b{color:var(--text);}
+  .error-box{font-size:12px; color:var(--red); background:var(--red-dim); border:1px solid #5A332E; border-radius:8px; padding:10px 12px; line-height:1.5; max-height:120px; overflow-y:auto;}
+
+  .config-section{margin-bottom:22px;}
+  .config-section h3{font-family:'Oswald',sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-dim); margin-bottom:10px;}
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--surface2); border:1px solid var(--border);
+    color:var(--text); padding:11px 18px; border-radius:9px; font-size:13px; z-index:100; box-shadow:0 6px 20px rgba(0,0,0,.4); max-width:85%; text-align:center;
+  }
+  .loading{display:flex; align-items:center; justify-content:center; min-height:60vh; color:var(--text-dim); font-size:13px;}
+  .summary-block{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:13px; margin-bottom:10px;}
+  .summary-block .row1{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .summary-block .obs{font-size:13px; color:var(--text-dim); margin-top:6px; line-height:1.4;}
+  .meta-line{font-size:12px; color:var(--text-dim); margin-bottom:8px; line-height:1.6;}
+  .meta-line b{color:var(--text);}
+  .score-display{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; font-weight:700; font-size:14px; margin-bottom:14px;}
+  textarea#add-textarea{width:100%; min-height:100px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:10px; font-family:'JetBrains Mono',monospace; font-size:13px; outline:none; margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">Cargando…</div></div>
+
+<div id="security-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:200; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; max-width:340px; width:100%;">
+    <div style="font-size:14px; color:var(--text); margin-bottom:14px; line-height:1.5;" id="security-modal-message"></div>
+    <input type="password" id="security-modal-input" inputmode="numeric" autocomplete="off" placeholder="Código de seguridad" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:11px 12px; font-size:16px; margin-bottom:8px; outline:none; letter-spacing:3px; font-family:'JetBrains Mono',monospace;">
+    <div id="security-modal-error" style="display:none; color:var(--red); font-size:12px; margin-bottom:10px;">Código incorrecto. Probá de nuevo.</div>
+    <div style="display:flex; gap:8px; margin-top:6px;">
+      <button id="security-modal-cancel" class="btn secondary" style="flex:1;">Cancelar</button>
+      <button id="security-modal-confirm" class="btn danger" style="flex:1;">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div id="lightbox-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:250; align-items:center; justify-content:center; padding:0;">
+  <button id="lightbox-close" style="position:absolute; top:16px; right:16px; background:var(--surface2); border:1px solid var(--border); color:var(--text); width:38px; height:38px; border-radius:8px; font-size:18px; cursor:pointer; z-index:2;">✕</button>
+  <div id="lightbox-counter" style="position:absolute; top:22px; left:16px; color:var(--text-dim); font-size:13px; font-family:'JetBrains Mono',monospace;"></div>
+  <button id="lightbox-prev" style="display:none; position:absolute; left:8px; top:50%; transform:translateY(-50%); background:var(--surface2); border:1px solid var(--border); color:var(--text); width:42px; height:42px; border-radius:50%; font-size:18px; cursor:pointer; z-index:2;">‹</button>
+  <img id="lightbox-img" src="" style="max-width:94vw; max-height:88vh; object-fit:contain; border-radius:4px;">
+  <button id="lightbox-next" style="display:none; position:absolute; right:8px; top:50%; transform:translateY(-50%); background:var(--surface2); border:1px solid var(--border); color:var(--text); width:42px; height:42px; border-radius:50%; font-size:18px; cursor:pointer; z-index:2;">›</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBucGehaAyYusww2jGNCzC62Kae0yI6I4s",
+  authDomain: "relevamiento-carroceria.firebaseapp.com",
+  projectId: "relevamiento-carroceria",
+  storageBucket: "relevamiento-carroceria.firebasestorage.app",
+  messagingSenderId: "429221920128",
+  appId: "1:429221920128:web:5b44ad9ad0a3e5fd7fd565"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+function photoUrl(p){
+  if(!p) return '';
+  return (typeof p === 'string') ? p : (p.url || '');
+}
+function dataURLtoBlob(dataUrl){
+  const arr = dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+  return new Blob([u8arr], { type: mime });
+}
+async function uploadPhoto(dataUrl, unitId){
+  const blob = dataURLtoBlob(dataUrl);
+  const path = `fotos/${unitId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+  const ref = storage.ref().child(path);
+  await ref.put(blob);
+  const url = await ref.getDownloadURL();
+  return { url, path };
+}
+async function deletePhotoFile(path){
+  if(!path) return;
+  try{ await storage.ref().child(path).delete(); }catch(e){ console.error(e); }
+}
+
+async function dbGetMaster(){
+  const doc = await db.collection('app').doc('config').get();
+  return doc.exists ? (doc.data().masterList || []) : null;
+}
+async function dbSetMaster(list){
+  await db.collection('app').doc('config').set({ masterList: list });
+}
+async function dbListUnitIds(){
+  const snap = await db.collection('units').get();
+  return snap.docs.map(d => d.id);
+}
+async function dbGetUnit(id){
+  const doc = await db.collection('units').doc(id).get();
+  return doc.exists ? doc.data() : null;
+}
+async function dbSetUnit(id, record){
+  await db.collection('units').doc(id).set(record);
+}
+async function dbDeleteUnit(id){
+  await db.collection('units').doc(id).delete();
+}
+
+const LOGO_B64 = "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";
+
+const ZONAS = ["Frente","Lateral izquierdo","Lateral derecho","Trasera","Techo","Piso","Puerta delantera","Puerta trasera","Ventanas","Parabrisas","Paragolpes / defensa"];
+const TIPOS = ["Desalineación de paneles","Holgura en puertas/ventanas","Óxido / corrosión","Golpe / abolladura","Fisura / rajadura","Pintura descascarada","Sellado deficiente","Filtración de agua","Otro"];
+const TALLERES = ["MOR","PIL","SAA"];
+const LINEAS = ["203 Moreno","203 Pilar"];
+const SCORES = [
+  {val:1, label:'Crítico'},
+  {val:2, label:'Malo'},
+  {val:3, label:'Regular'},
+  {val:4, label:'Bueno'},
+  {val:5, label:'Excelente'}
+];
+const MAX_PHOTOS = 8;
+const APP_VERSION = "v2.1 (Firebase Storage) · 19-08-2026";
+let currentPhotos = [];
+
+let state = {
+  screen: 'loading', // loading | setup | dashboard | detail
+  tab: 'pending', // pending | done | config
+  masterList: [], // [{id, taller, linea, anio, modelo}]
+  unitsById: {},
+  completedSet: new Set(),
+  recordsCache: {}, // id -> record
+  search: '',
+  filterTaller: '',
+  filterLinea: '',
+  detailId: null,
+  detailRecord: null,
+  lastUser: ''
+};
+
+const app = document.getElementById('app');
+
+function sanitizeId(raw){
+  return raw.trim().replace(/[\/\\'"]+/g,'-').replace(/\s+/g,'-');
+}
+function matchTaller(raw){
+  const r = raw.trim().toUpperCase();
+  return TALLERES.find(t => t.toUpperCase() === r) || null;
+}
+function matchLinea(raw){
+  const r = raw.trim().toLowerCase();
+  return LINEAS.find(l => l.toLowerCase() === r) || null;
+}
+function validAnio(raw){
+  const n = parseInt(raw.trim(), 10);
+  if(isNaN(n)) return null;
+  if(n < 1980 || n > 2035) return null;
+  return String(n);
+}
+
+function parseMasterInput(text){
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const valid = [];
+  const errors = [];
+  lines.forEach((line, idx) => {
+    const parts = line.split(/[,;\t]/).map(p=>p.trim()).filter(Boolean);
+    if(parts.length < 5){
+      errors.push(`Línea ${idx+1}: "${line}" — faltan datos (se esperan ID, taller, línea, año modelo, modelo)`);
+      return;
+    }
+    const id = sanitizeId(parts[0]);
+    const taller = matchTaller(parts[1]);
+    const linea = matchLinea(parts[2]);
+    const anio = validAnio(parts[3]);
+    const modelo = parts[4];
+    if(!id){ errors.push(`Línea ${idx+1}: ID vacío`); return; }
+    if(!taller){ errors.push(`Línea ${idx+1}: taller "${parts[1]}" no reconocido (usar ${TALLERES.join('/')})`); return; }
+    if(!linea){ errors.push(`Línea ${idx+1}: línea "${parts[2]}" no reconocida (usar ${LINEAS.join(' / ')})`); return; }
+    if(!anio){ errors.push(`Línea ${idx+1}: año modelo "${parts[3]}" inválido`); return; }
+    if(!modelo){ errors.push(`Línea ${idx+1}: falta el modelo`); return; }
+    valid.push({id, taller, linea, anio, modelo});
+  });
+  return {valid, errors};
+}
+
+const SECURITY_CODE = "2650";
+let securityModalResolve = null;
+
+function requestSecurityCode(message){
+  return new Promise((resolve) => {
+    securityModalResolve = resolve;
+    document.getElementById('security-modal-message').textContent = message + ' (esta acción no se puede deshacer)';
+    const input = document.getElementById('security-modal-input');
+    input.value = '';
+    document.getElementById('security-modal-error').style.display = 'none';
+    document.getElementById('security-modal-overlay').style.display = 'flex';
+    setTimeout(()=>input.focus(), 50);
+  });
+}
+function closeSecurityModal(result){
+  document.getElementById('security-modal-overlay').style.display = 'none';
+  if(securityModalResolve){ securityModalResolve(result); securityModalResolve = null; }
+}
+let lightboxPhotos = [];
+let lightboxIndex = 0;
+function openLightbox(photos, idx){
+  if(!photos || photos.length === 0) return;
+  lightboxPhotos = photos;
+  lightboxIndex = idx;
+  renderLightbox();
+  document.getElementById('lightbox-overlay').style.display = 'flex';
+}
+function renderLightbox(){
+  document.getElementById('lightbox-img').src = lightboxPhotos[lightboxIndex];
+  document.getElementById('lightbox-counter').textContent = lightboxPhotos.length > 1 ? `${lightboxIndex+1} / ${lightboxPhotos.length}` : '';
+  const multi = lightboxPhotos.length > 1;
+  document.getElementById('lightbox-prev').style.display = multi ? 'flex' : 'none';
+  document.getElementById('lightbox-next').style.display = multi ? 'flex' : 'none';
+}
+function closeLightbox(){
+  document.getElementById('lightbox-overlay').style.display = 'none';
+}
+function initLightbox(){
+  const overlay = document.getElementById('lightbox-overlay');
+  document.getElementById('lightbox-close').onclick = closeLightbox;
+  document.getElementById('lightbox-prev').onclick = () => {
+    lightboxIndex = (lightboxIndex - 1 + lightboxPhotos.length) % lightboxPhotos.length;
+    renderLightbox();
+  };
+  document.getElementById('lightbox-next').onclick = () => {
+    lightboxIndex = (lightboxIndex + 1) % lightboxPhotos.length;
+    renderLightbox();
+  };
+  overlay.addEventListener('click', (e) => { if(e.target === overlay) closeLightbox(); });
+  document.addEventListener('keydown', (e) => {
+    if(overlay.style.display !== 'flex') return;
+    if(e.key === 'Escape') closeLightbox();
+    if(e.key === 'ArrowLeft') document.getElementById('lightbox-prev').click();
+    if(e.key === 'ArrowRight') document.getElementById('lightbox-next').click();
+  });
+}
+
+function initSecurityModal(){
+  const overlay = document.getElementById('security-modal-overlay');
+  const input = document.getElementById('security-modal-input');
+  const confirmBtn = document.getElementById('security-modal-confirm');
+  const cancelBtn = document.getElementById('security-modal-cancel');
+
+  confirmBtn.onclick = () => {
+    if(input.value.trim() === SECURITY_CODE){
+      closeSecurityModal(true);
+    } else {
+      document.getElementById('security-modal-error').style.display = 'block';
+      input.value = '';
+      input.focus();
+    }
+  };
+  cancelBtn.onclick = () => closeSecurityModal(false);
+  overlay.addEventListener('click', (e) => { if(e.target === overlay) closeSecurityModal(false); });
+  input.addEventListener('keydown', (e) => { if(e.key === 'Enter') confirmBtn.click(); });
+}
+
+function toast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 3200);
+}
+
+function buildUnitsById(){
+  state.unitsById = {};
+  state.masterList.forEach(u => { state.unitsById[u.id] = u; });
+}
+
+async function loadAll(){
+  try{
+    let masterList = null;
+    try{ masterList = await dbGetMaster(); }catch(e){ masterList = null; console.error(e); }
+    if(masterList === null){
+      state.screen = 'setup';
+      render();
+      return;
+    }
+    state.masterList = masterList;
+    buildUnitsById();
+
+    let ids = [];
+    try{ ids = await dbListUnitIds(); }catch(e){ ids = []; }
+    state.completedSet = new Set(ids);
+    state.recordsCache = {};
+
+    try{ state.lastUser = localStorage.getItem('relevamiento-last-user') || ''; }catch(e){ state.lastUser = ''; }
+
+    state.screen = 'dashboard';
+    render();
+  }catch(err){
+    console.error(err);
+    app.innerHTML = `<div class="loading">Error cargando datos. <br><br><button class="btn small" onclick="loadAll()">Reintentar</button></div>`;
+  }
+}
+
+async function ensureRecordsLoaded(ids){
+  const missing = ids.filter(id => !(id in state.recordsCache));
+  if(missing.length === 0) return;
+  await Promise.all(missing.map(async id => {
+    try{
+      state.recordsCache[id] = await dbGetUnit(id);
+    }catch(e){ state.recordsCache[id] = null; }
+  }));
+}
+
+function render(){
+  if(state.screen === 'setup') return renderSetup();
+  if(state.screen === 'dashboard') return renderDashboard();
+  if(state.screen === 'detail') return renderDetail();
+}
+
+function renderSetup(){
+  app.innerHTML = `
+    <div class="setup-wrap">
+      <div class="brand" style="margin-bottom:2px;">
+        <div class="brand-mark"><img src="data:image/png;base64,${LOGO_B64}" alt="Rosario Bus"></div>
+        <div class="brand-text">
+          <h1 style="font-size:14px;">Relevamiento de Carrocerías</h1>
+        </div>
+      </div>
+      <h2>Cargar flota</h2>
+      <p>Pegá una unidad por línea: <b style="color:var(--text)">ID, taller, línea, año modelo, modelo del coche</b> (ej: "MB O500 1723-59").<br>Talleres válidos: <b style="color:var(--text)">${TALLERES.join(' / ')}</b>. Líneas válidas: <b style="color:var(--text)">${LINEAS.join(' / ')}</b>.</p>
+      <textarea id="setup-textarea" placeholder="INT-045, MOR, 203 Moreno, 2019, MB O500 1723-59
+INT-102, PIL, 203 Pilar, 2021, MB O500 1723-59
+AB123CD, SAA, 203 Moreno, 2018, MB O500 1723-59
+..."></textarea>
+      <div id="setup-errors"></div>
+      <div class="hint">Los IDs no deben tener espacios ni barras ( / \\ ) — se limpian automáticamente. Separá los 5 valores con coma, punto y coma o tabulación.</div>
+      <button class="btn" id="save-setup">Guardar lista y empezar</button>
+    </div>
+  `;
+  document.getElementById('save-setup').onclick = async ()=>{
+    const raw = document.getElementById('setup-textarea').value;
+    const {valid, errors} = parseMasterInput(raw);
+    const errBox = document.getElementById('setup-errors');
+    if(errors.length){
+      errBox.innerHTML = `<div class="error-box"><b>${errors.length} línea(s) con problemas — no se cargaron:</b><br>${errors.slice(0,15).map(e=>escapeHtml(e)).join('<br>')}${errors.length>15?'<br>…':''}</div>`;
+    } else {
+      errBox.innerHTML = '';
+    }
+    if(valid.length === 0){ toast('No se pudo cargar ninguna unidad válida.'); return; }
+    const dedup = {};
+    valid.forEach(u => dedup[u.id] = u);
+    const list = Object.values(dedup).sort((a,b)=>a.id.localeCompare(b.id));
+    try{
+      await dbSetMaster(list);
+      toast(`Lista guardada: ${list.length} unidades${errors.length? ' ('+errors.length+' con error, revisá arriba)':''}.`);
+      state.masterList = list;
+      buildUnitsById();
+      state.screen = 'dashboard';
+      state.tab = 'pending';
+      await loadAll();
+    }catch(e){
+      toast('Error guardando la lista. Probá de nuevo.');
+    }
+  };
+}
+
+function passesFilters(u){
+  if(state.filterTaller && u.taller !== state.filterTaller) return false;
+  if(state.filterLinea && u.linea !== state.filterLinea) return false;
+  if(state.search && !u.id.toLowerCase().includes(state.search.toLowerCase())) return false;
+  return true;
+}
+function passesTallerLinea(u){
+  if(state.filterTaller && u.taller !== state.filterTaller) return false;
+  if(state.filterLinea && u.linea !== state.filterLinea) return false;
+  return true;
+}
+function getPendingUnits(){ return state.masterList.filter(u => !state.completedSet.has(u.id)); }
+function getDoneUnits(){ return state.masterList.filter(u => state.completedSet.has(u.id)); }
+
+function filterChipsHtml(){
+  return `
+    <div class="filter-row">
+      <div class="filter-group">
+        <div class="filter-chip ${state.filterTaller===''?'on':''}" data-action="filter-taller" data-val="">Todos talleres</div>
+        ${TALLERES.map(t => `<div class="filter-chip ${state.filterTaller===t?'on':''}" data-action="filter-taller" data-val="${t}">${t}</div>`).join('')}
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <div class="filter-chip ${state.filterLinea===''?'on':''}" data-action="filter-linea" data-val="">Todas líneas</div>
+        ${LINEAS.map(l => `<div class="filter-chip ${state.filterLinea===l?'on':''}" data-action="filter-linea" data-val="${l}">${l}</div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderDashboard(){
+  const pending = getPendingUnits();
+  const done = getDoneUnits();
+  const filteredForStats = state.masterList.filter(passesTallerLinea);
+  const total = filteredForStats.length;
+  const pendingCount = filteredForStats.filter(u => !state.completedSet.has(u.id)).length;
+  const doneCount = filteredForStats.length - pendingCount;
+
+  let listHtml = '';
+  if(state.tab === 'config'){
+    listHtml = renderConfigTab();
+  } else {
+    const base = state.tab === 'pending' ? pending : done;
+    const units = base.filter(passesFilters);
+    listHtml = `<div class="search-box"><span class="ico">🔎</span><input id="search-input" placeholder="Buscar por ID de unidad…" value="${escapeHtml(state.search)}"></div>` + filterChipsHtml();
+    if(units.length === 0){
+      listHtml += `
+        <div class="empty-state">
+          <div class="big">${state.tab === 'pending' ? '✅' : '🗂️'}</div>
+          <p>${state.tab === 'pending' ? 'No hay unidades pendientes que coincidan.' : 'No hay unidades relevadas que coincidan.'}</p>
+        </div>`;
+    } else if(state.tab === 'done'){
+      listHtml += units.map(u => {
+        const rec = state.recordsCache[u.id];
+        const scoreHtml = rec && rec.puntaje ? `<span class="score-pill s${rec.puntaje}">Puntaje ${rec.puntaje}/5</span>` : '';
+        const line2 = rec ? `${escapeHtml(rec.usuario||'—')} · ${formatDateShort(rec.fecha)}` : 'Cargando…';
+        return `
+          <div class="unit-item done" data-action="open" data-id="${escapeHtml(u.id)}">
+            <div class="unit-chip">${escapeHtml(u.id)}</div>
+            <div class="unit-meta">
+              <div class="m1"><span class="tag">${escapeHtml(u.taller)}</span><span class="tag">${escapeHtml(u.linea)}</span>${scoreHtml}</div>
+              <div class="m2">${line2}</div>
+            </div>
+            <div class="status-dot"></div>
+            <div class="chevron">›</div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      listHtml += units.map(u => `
+          <div class="unit-item" data-action="open" data-id="${escapeHtml(u.id)}">
+            <div class="unit-chip">${escapeHtml(u.id)}</div>
+            <div class="unit-meta">
+              <div class="m1"><span class="tag">${escapeHtml(u.taller)}</span><span class="tag">${escapeHtml(u.linea)}</span><span class="tag">${escapeHtml(u.anio||'—')}</span><span class="tag">${escapeHtml(u.modelo||'—')}</span></div>
+            </div>
+            <div class="status-dot"></div>
+            <div class="chevron">›</div>
+          </div>
+        `).join('');
+    }
+  }
+
+  app.innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div class="brand">
+          <div class="brand-mark"><img src="data:image/png;base64,${LOGO_B64}" alt="Rosario Bus"></div>
+          <div class="brand-text">
+            <h1>Desvíos de Carrocería</h1>
+            <p>Relevamiento de flota · ${APP_VERSION}</p>
+          </div>
+        </div>
+        <button class="icon-btn" data-action="refresh" title="Actualizar">⟳</button>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total</div></div>
+        <div class="stat-card pend"><div class="stat-num">${pendingCount}</div><div class="stat-label">Pendientes</div></div>
+        <div class="stat-card done"><div class="stat-num">${doneCount}</div><div class="stat-label">Relevadas</div></div>
+      </div>
+      <div class="tabs">
+        <div class="tab ${state.tab==='pending'?'active':''}" data-action="tab" data-tab="pending">Pendientes</div>
+        <div class="tab ${state.tab==='done'?'active':''}" data-action="tab" data-tab="done">Relevadas</div>
+        <div class="tab ${state.tab==='config'?'active':''}" data-action="tab" data-tab="config">Config</div>
+      </div>
+    </div>
+    <div class="content">${listHtml}</div>
+  `;
+
+  const si = document.getElementById('search-input');
+  if(si){
+    si.addEventListener('input', (e)=>{ state.search = e.target.value; render(); const s=document.getElementById('search-input'); if(s){s.focus(); s.selectionStart=s.selectionEnd=s.value.length;} });
+    if(state.search) si.focus();
+  }
+
+  if(state.tab === 'done'){
+    const idsNeeding = done.filter(passesFilters).map(u=>u.id).filter(id => !(id in state.recordsCache));
+    if(idsNeeding.length){
+      ensureRecordsLoaded(idsNeeding).then(()=>{ if(state.screen==='dashboard' && state.tab==='done') render(); });
+    }
+  }
+}
+
+function renderConfigTab(){
+  return `
+    <div class="config-section">
+      <h3>Ampliar flota</h3>
+      <p style="font-size:13px; color:var(--text-dim); margin-bottom:10px;">Agregá unidades nuevas: una por línea, formato <b style="color:var(--text)">ID, taller, línea, año modelo, modelo del coche</b>. Talleres: ${TALLERES.join('/')}. Líneas: ${LINEAS.join(' / ')}.</p>
+      <textarea id="add-textarea" placeholder="INT-201, MOR, 203 Moreno, 2020, MB O500 1723-59"></textarea>
+      <div id="add-errors"></div>
+      <button class="btn secondary small" data-action="add-units">Agregar unidades</button>
+    </div>
+    <div class="config-section">
+      <h3>Exportar datos</h3>
+      <p style="font-size:13px; color:var(--text-dim); margin-bottom:10px;">Descarga un CSV con todos los desvíos relevados, incluyendo taller, línea, año, modelo y puntaje.</p>
+      <button class="btn secondary small" data-action="export">⬇ Descargar CSV</button>
+    </div>
+    <div class="config-section">
+      <h3>Zona de riesgo</h3>
+      <p style="font-size:13px; color:var(--text-dim); margin-bottom:10px;">Esto borra TODOS los relevamientos guardados (la lista de unidades se mantiene). No se puede deshacer.</p>
+      <button class="btn danger small" data-action="wipe">Borrar todos los relevamientos</button>
+    </div>
+    <div style="text-align:center; padding:10px 0 4px 0; font-size:11px; color:var(--text-dim); font-family:'JetBrains Mono',monospace;">${APP_VERSION}</div>
+  `;
+}
+
+async function renderDetail(){
+  const id = state.detailId;
+  const u = state.unitsById[id] || {};
+  const isDone = state.completedSet.has(id);
+  const rec = state.detailRecord;
+
+  let body = '';
+  if(isDone && rec){
+    const scoreInfo = SCORES.find(s=>s.val===rec.puntaje);
+    body = `
+      <div class="meta-line">
+        <b>${escapeHtml(u.anio||'—')}</b> · Modelo <b>${escapeHtml(u.modelo||'—')}</b><br>
+        Relevada por <b>${escapeHtml(rec.usuario||'—')}</b> el ${formatDate(rec.fecha)}
+      </div>
+      ${scoreInfo ? `<div class="score-display score-pill s${scoreInfo.val}">Puntaje general: ${scoreInfo.val}/5 · ${escapeHtml(scoreInfo.label)}</div>` : ''}
+      ${rec.fotos && rec.fotos.length ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">${rec.fotos.map((p,i) => `<img src="${photoUrl(p)}" data-action="view-photo" data-idx="${i}" data-source="record" style="width:90px; height:90px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer;">`).join('')}</div>` : ''}
+      ${rec.desvios && rec.desvios.length ? rec.desvios.map(d => `
+        <div class="summary-block">
+          <div class="row1">
+            <b style="font-size:13.5px;">${escapeHtml(d.zona)}</b>
+            <span class="badge ${d.severidad.toLowerCase()}">${escapeHtml(d.severidad)}</span>
+          </div>
+          <div style="font-size:13px; color:var(--text-dim);">${escapeHtml(d.tipo)}</div>
+          ${d.observaciones ? `<div class="obs">${escapeHtml(d.observaciones)}</div>` : ''}
+        </div>
+      `).join('') : `<div class="empty-state"><div class="big">✅</div><p>No se detectaron desvíos en esta unidad.</p></div>`}
+      <button class="btn secondary" style="margin-top:10px;" data-action="edit-unit">Editar relevamiento</button>
+    `;
+  } else {
+    body = `<div class="meta-line"><b>${escapeHtml(u.anio||'—')}</b> · Modelo <b>${escapeHtml(u.modelo||'—')}</b></div>` + renderForm(rec);
+  }
+
+  const dangerZone = `
+    <div style="margin-top:22px; padding-top:16px; border-top:1px solid var(--border);">
+      ${isDone ? `<button class="btn danger small" data-action="delete-relevamiento" style="margin-bottom:8px;">🗑 Eliminar este relevamiento</button><br>` : ''}
+      <button class="btn danger small" data-action="delete-unit" style="margin-top:8px;">🗑 Eliminar unidad de la flota</button>
+    </div>
+  `;
+  body += dangerZone;
+
+  app.innerHTML = `
+    <div class="detail-header">
+      <button class="back-btn" data-action="back">←</button>
+      <div>
+        <div class="detail-title-chip">${escapeHtml(id)}</div>
+        <div class="detail-sub"><span class="tag">${escapeHtml(u.taller||'—')}</span><span class="tag">${escapeHtml(u.linea||'—')}</span></div>
+      </div>
+    </div>
+    <div class="content" id="detail-content">${body}</div>
+  `;
+
+  attachFormHandlers();
+  const editBtn = document.querySelector('[data-action="edit-unit"]');
+  if(editBtn){
+    editBtn.onclick = ()=>{
+      renderDetailAsForm();
+    };
+  }
+}
+
+function renderDetailAsForm(){
+  const u = state.unitsById[state.detailId] || {};
+  const rec = state.detailRecord;
+  const body = `<div class="meta-line"><b>${escapeHtml(u.anio||'—')}</b> · Modelo <b>${escapeHtml(u.modelo||'—')}</b></div>` + renderForm(rec);
+  document.getElementById('detail-content').innerHTML = body;
+  attachFormHandlers();
+}
+
+function renderForm(existingRec){
+  const noneChecked = existingRec && existingRec.desvios && existingRec.desvios.length === 0;
+  const entries = (existingRec && existingRec.desvios && existingRec.desvios.length) ? existingRec.desvios : [null];
+  const usuarioVal = (existingRec && existingRec.usuario) ? existingRec.usuario : state.lastUser;
+  const scoreVal = existingRec ? existingRec.puntaje : null;
+  currentPhotos = (existingRec && existingRec.fotos) ? existingRec.fotos.slice() : [];
+
+  return `
+    <div class="score-section">
+      <label>Puntaje general de la carrocería</label>
+      <div class="score-row">
+        ${SCORES.map(s => `
+          <div class="score-opt ${scoreVal===s.val?'on':''}" data-score="${s.val}">
+            <div class="n">${s.val}</div>
+            <div class="l">${escapeHtml(s.label)}</div>
+          </div>
+        `).join('')}
+      </div>
+      <input type="hidden" id="f-puntaje" value="${scoreVal||''}">
+    </div>
+
+    <div class="field">
+      <label>Fotos de la unidad (opcional, máx. ${MAX_PHOTOS})</label>
+      <div id="photos-grid" style="margin-bottom:8px;">${photosGridHtml()}</div>
+      <input type="file" id="foto-input" accept="image/*" capture="environment" multiple style="display:none;">
+      <button type="button" class="btn secondary small" data-action="add-photo">📷 Agregar foto</button>
+    </div>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="no-desvios" ${noneChecked ? 'checked' : ''}>
+      <span>No se detectaron desvíos en esta unidad</span>
+    </div>
+    <div id="desvios-list" style="${noneChecked ? 'display:none;' : ''}">
+      ${entries.map((d,i) => desvioCardHtml(i, d)).join('')}
+    </div>
+    <button class="btn secondary" id="add-desvio-btn" style="margin-bottom:18px; ${noneChecked ? 'display:none;' : ''}">+ Agregar otro desvío</button>
+
+    <div class="field">
+      <label>Relevado por</label>
+      <input type="text" id="usuario-input" placeholder="Tu nombre" value="${escapeHtml(usuarioVal||'')}">
+    </div>
+
+    <button class="btn" id="submit-btn">Guardar relevamiento</button>
+  `;
+}
+
+function photosGridHtml(){
+  if(currentPhotos.length===0){
+    return `<div style="font-size:12px; color:var(--text-dim); padding:4px 0 8px 0;">Sin fotos cargadas.</div>`;
+  }
+  return `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px;">` +
+    currentPhotos.map((p,i)=>`
+      <div style="position:relative; width:74px; height:74px;">
+        <img src="${photoUrl(p)}" data-action="view-photo" data-idx="${i}" data-source="current" style="width:100%; height:100%; object-fit:cover; border-radius:8px; border:1px solid var(--border); display:block; cursor:pointer;">
+        <button type="button" data-action="rm-photo" data-idx="${i}" style="position:absolute; top:-6px; right:-6px; background:var(--red-dim); color:var(--red); border:1px solid #5A332E; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; line-height:1;">✕</button>
+      </div>
+    `).join('') +
+  `</div>`;
+}
+
+function compressImage(file, maxDim=800, quality=0.5){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w >= h){ if(w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; } }
+        else { if(h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; } }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('No se pudo leer la imagen'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handlePhotoFiles(e){
+  const files = Array.from(e.target.files || []);
+  if(files.length === 0) return;
+  const remaining = MAX_PHOTOS - currentPhotos.length;
+  if(remaining <= 0){ toast(`Máximo ${MAX_PHOTOS} fotos por unidad.`); e.target.value=''; return; }
+  const toProcess = files.slice(0, remaining);
+  if(files.length > toProcess.length){ toast(`Solo se procesan ${toProcess.length} (máximo ${MAX_PHOTOS} fotos).`); }
+  const unitId = state.detailId;
+  toast('Subiendo foto(s)…');
+  for(const f of toProcess){
+    try{
+      const dataUrl = await compressImage(f, 1400, 0.78);
+      const uploaded = await uploadPhoto(dataUrl, unitId);
+      currentPhotos.push(uploaded);
+      const grid = document.getElementById('photos-grid');
+      if(grid) grid.innerHTML = photosGridHtml();
+    }catch(err){ console.error(err); toast('Una foto no se pudo subir. Revisá la conexión.'); }
+  }
+  e.target.value = '';
+}
+
+function desvioCardHtml(i, d){
+  d = d || {zona:'', tipo:'', severidad:'', observaciones:''};
+  return `
+    <div class="desvio-card">
+      <button type="button" class="rm" data-action="rm-desvio">✕</button>
+      <div class="desvio-num">Desvío ${i+1}</div>
+      <div class="field">
+        <label>Zona</label>
+        <select class="f-zona">
+          <option value="">Seleccionar…</option>
+          ${ZONAS.map(z => `<option value="${escapeHtml(z)}" ${d.zona===z?'selected':''}>${escapeHtml(z)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Tipo de desvío</label>
+        <select class="f-tipo">
+          <option value="">Seleccionar…</option>
+          ${TIPOS.map(t => `<option value="${escapeHtml(t)}" ${d.tipo===t?'selected':''}>${escapeHtml(t)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Severidad</label>
+        <div class="sev-row">
+          <div class="sev-opt sel-leve ${d.severidad==='Leve'?'on':''}" data-sev="Leve">Leve</div>
+          <div class="sev-opt sel-moderado ${d.severidad==='Moderado'?'on':''}" data-sev="Moderado">Moderado</div>
+          <div class="sev-opt sel-grave ${d.severidad==='Grave'?'on':''}" data-sev="Grave">Grave</div>
+        </div>
+        <input type="hidden" class="f-severidad" value="${escapeHtml(d.severidad||'')}">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>Observaciones</label>
+        <textarea class="f-obs" placeholder="Detalle adicional (opcional)">${escapeHtml(d.observaciones||'')}</textarea>
+      </div>
+    </div>
+  `;
+}
+
+function attachFormHandlers(){
+  const fotoInput = document.getElementById('foto-input');
+  if(fotoInput){
+    fotoInput.onchange = handlePhotoFiles;
+  }
+
+  const scoreOpts = document.querySelectorAll('.score-opt');
+  scoreOpts.forEach(opt => {
+    opt.onclick = () => {
+      scoreOpts.forEach(o => o.classList.remove('on'));
+      opt.classList.add('on');
+      document.getElementById('f-puntaje').value = opt.dataset.score;
+    };
+  });
+
+  const noDesv = document.getElementById('no-desvios');
+  const list = document.getElementById('desvios-list');
+  const addBtn = document.getElementById('add-desvio-btn');
+
+  if(noDesv){
+    noDesv.addEventListener('change', ()=>{
+      if(noDesv.checked){ list.style.display='none'; addBtn.style.display='none'; }
+      else { list.style.display=''; addBtn.style.display=''; if(list.children.length===0){ list.insertAdjacentHTML('beforeend', desvioCardHtml(0,null)); bindCard(list.lastElementChild); } }
+    });
+  }
+  Array.from(document.querySelectorAll('.desvio-card')).forEach(bindCard);
+
+  if(addBtn){
+    addBtn.onclick = ()=>{
+      const idx = list.children.length;
+      list.insertAdjacentHTML('beforeend', desvioCardHtml(idx, null));
+      bindCard(list.lastElementChild);
+    };
+  }
+
+  const submitBtn = document.getElementById('submit-btn');
+  if(submitBtn){
+    submitBtn.onclick = submitForm;
+  }
+}
+
+function bindCard(card){
+  const rm = card.querySelector('[data-action="rm-desvio"]');
+  rm.onclick = ()=>{ card.remove(); };
+  Array.from(card.querySelectorAll('.sev-opt')).forEach(opt=>{
+    opt.onclick = ()=>{
+      Array.from(card.querySelectorAll('.sev-opt')).forEach(o=>o.classList.remove('on'));
+      opt.classList.add('on');
+      card.querySelector('.f-severidad').value = opt.dataset.sev;
+    };
+  });
+}
+
+async function submitForm(){
+  const id = state.detailId;
+  const puntaje = parseInt(document.getElementById('f-puntaje').value, 10);
+  if(!puntaje){ toast('Elegí un puntaje general para la carrocería.'); return; }
+  const noDesv = document.getElementById('no-desvios').checked;
+  const usuario = document.getElementById('usuario-input').value.trim();
+  if(!usuario){ toast('Ingresá quién releva la unidad.'); return; }
+
+  let desvios = [];
+  if(!noDesv){
+    const cards = Array.from(document.querySelectorAll('.desvio-card'));
+    if(cards.length === 0){ toast('Agregá al menos un desvío, o marcá "No se detectaron desvíos".'); return; }
+    for(const c of cards){
+      const zona = c.querySelector('.f-zona').value;
+      const tipo = c.querySelector('.f-tipo').value;
+      const sev = c.querySelector('.f-severidad').value;
+      const obs = c.querySelector('.f-obs').value.trim();
+      if(!zona || !tipo || !sev){ toast('Completá zona, tipo y severidad en todos los desvíos.'); return; }
+      desvios.push({zona, tipo, severidad:sev, observaciones:obs});
+    }
+  }
+
+  const record = { usuario, fecha: new Date().toISOString(), puntaje, desvios, fotos: currentPhotos.slice() };
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try{
+    await dbSetUnit(id, record);
+    try{ localStorage.setItem('relevamiento-last-user', usuario); }catch(e){}
+    state.completedSet.add(id);
+    state.recordsCache[id] = record;
+    state.lastUser = usuario;
+    toast('Relevamiento guardado ✓');
+    state.screen = 'dashboard';
+    state.tab = 'pending';
+    render();
+  }catch(e){
+    console.error(e);
+    toast('Error al guardar. Probá de nuevo.');
+    btn.disabled = false; btn.textContent = 'Guardar relevamiento';
+  }
+}
+
+async function openUnit(id){
+  state.detailId = id;
+  state.detailRecord = null;
+  if(state.completedSet.has(id)){
+    try{
+      if(id in state.recordsCache && state.recordsCache[id]){
+        state.detailRecord = state.recordsCache[id];
+      } else {
+        state.detailRecord = await dbGetUnit(id);
+        state.recordsCache[id] = state.detailRecord;
+      }
+    }catch(e){ state.detailRecord = null; }
+  }
+  state.screen = 'detail';
+  render();
+}
+
+async function exportCSV(){
+  toast('Preparando CSV…');
+  const units = getDoneUnits();
+  let rows = [['unidad','taller','linea','anio_modelo','modelo','puntaje','usuario','fecha','zona','tipo_desvio','severidad','observaciones']];
+  for(const u of units){
+    try{
+      const rec = await dbGetUnit(u.id);
+      if(!rec) continue;
+      if(!rec.desvios || rec.desvios.length===0){
+        rows.push([u.id, u.taller, u.linea, u.anio, u.modelo, rec.puntaje||'', rec.usuario, rec.fecha, '', 'SIN DESVIOS', '', '']);
+      } else {
+        rec.desvios.forEach(d=>{
+          rows.push([u.id, u.taller, u.linea, u.anio, u.modelo, rec.puntaje||'', rec.usuario, rec.fecha, d.zona, d.tipo, d.severidad, (d.observaciones||'').replace(/\n/g,' ')]);
+        });
+      }
+    }catch(e){}
+  }
+  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `relevamiento-carrocerias-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast('CSV descargado ✓');
+}
+
+function escapeHtml(str){
+  return String(str||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function formatDate(iso){
+  try{
+    const d = new Date(iso);
+    const tz = 'America/Argentina/Buenos_Aires';
+    return d.toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric', timeZone:tz}) + ' ' + d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit', timeZone:tz}) + ' (GMT-3)';
+  }catch(e){ return iso; }
+}
+function formatDateShort(iso){
+  try{
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'2-digit', timeZone:'America/Argentina/Buenos_Aires'});
+  }catch(e){ return iso; }
+}
+
+document.addEventListener('click', async (e)=>{
+  const el = e.target.closest('[data-action]');
+  if(!el) return;
+  const action = el.dataset.action;
+
+  if(action === 'tab'){ state.tab = el.dataset.tab; state.search=''; render(); }
+  else if(action === 'open'){ openUnit(el.dataset.id); }
+  else if(action === 'back'){ state.screen='dashboard'; render(); }
+  else if(action === 'refresh'){ app.innerHTML = '<div class="loading">Actualizando…</div>'; await loadAll(); }
+  else if(action === 'export'){ exportCSV(); }
+  else if(action === 'filter-taller'){ state.filterTaller = el.dataset.val; render(); }
+  else if(action === 'filter-linea'){ state.filterLinea = el.dataset.val; render(); }
+  else if(action === 'add-photo'){
+    const fi = document.getElementById('foto-input');
+    if(fi) fi.click();
+  }
+  else if(action === 'rm-photo'){
+    const idx = parseInt(el.dataset.idx, 10);
+    const removed = currentPhotos.splice(idx, 1)[0];
+    const grid = document.getElementById('photos-grid');
+    if(grid) grid.innerHTML = photosGridHtml();
+    if(removed && typeof removed === 'object' && removed.path){
+      deletePhotoFile(removed.path);
+    }
+  }
+  else if(action === 'view-photo'){
+    const idx = parseInt(el.dataset.idx, 10);
+    const source = el.dataset.source;
+    const rawPhotos = source === 'current' ? currentPhotos : (state.detailRecord ? state.detailRecord.fotos : []);
+    const photos = (rawPhotos || []).map(photoUrl);
+    openLightbox(photos, idx);
+  }
+  else if(action === 'add-units'){
+    const ta = document.getElementById('add-textarea');
+    const {valid, errors} = parseMasterInput(ta.value);
+    const errBox = document.getElementById('add-errors');
+    if(errors.length){
+      errBox.innerHTML = `<div class="error-box"><b>${errors.length} línea(s) con problemas:</b><br>${errors.slice(0,15).map(x=>escapeHtml(x)).join('<br>')}</div>`;
+    } else { errBox.innerHTML = ''; }
+    if(valid.length === 0){ toast('No hay unidades válidas para agregar.'); return; }
+    const dedup = {};
+    state.masterList.forEach(u => dedup[u.id] = u);
+    let addedCount = 0, updatedCount = 0;
+    valid.forEach(u => { if(dedup[u.id]) updatedCount++; else addedCount++; dedup[u.id] = u; });
+    const merged = Object.values(dedup).sort((a,b)=>a.id.localeCompare(b.id));
+    try{
+      await dbSetMaster(merged);
+      state.masterList = merged;
+      buildUnitsById();
+      toast(`${addedCount} unidades nuevas${updatedCount? ', '+updatedCount+' actualizadas':''}.`);
+      render();
+    }catch(err){ toast('Error al guardar.'); }
+  }
+  else if(action === 'delete-relevamiento'){
+    const id = state.detailId;
+    if(!(await requestSecurityCode(`Para eliminar el relevamiento de la unidad ${id}, ingresá el código de seguridad:`))) return;
+    try{
+      await dbDeleteUnit(id);
+      state.completedSet.delete(id);
+      delete state.recordsCache[id];
+      toast('Relevamiento eliminado. La unidad volvió a pendientes.');
+      state.screen = 'dashboard';
+      state.tab = 'pending';
+      render();
+    }catch(e){ toast('Error al eliminar. Probá de nuevo.'); }
+  }
+  else if(action === 'delete-unit'){
+    const id = state.detailId;
+    if(!(await requestSecurityCode(`Para eliminar la unidad ${id} de la flota, ingresá el código de seguridad:`))) return;
+    try{
+      const wasDone = state.completedSet.has(id);
+      if(wasDone){
+        try{ await dbDeleteUnit(id); }catch(e){}
+      }
+      const merged = state.masterList.filter(u => u.id !== id);
+      await dbSetMaster(merged);
+      state.masterList = merged;
+      buildUnitsById();
+      state.completedSet.delete(id);
+      delete state.recordsCache[id];
+      toast(`Unidad ${id} eliminada de la flota.`);
+      state.screen = 'dashboard';
+      state.tab = 'pending';
+      render();
+    }catch(e){ toast('Error al eliminar la unidad.'); }
+  }
+  else if(action === 'wipe'){
+    if(!(await requestSecurityCode('Esto borra TODOS los relevamientos. Ingresá el código de seguridad para confirmar:'))) return;
+    const keys = await dbListUnitIds();
+    for(const k of keys){
+      try{ await dbDeleteUnit(k); }catch(e){}
+    }
+    state.completedSet = new Set();
+    state.recordsCache = {};
+    toast('Relevamientos borrados.');
+    render();
+  }
+});
+
+initSecurityModal();
+initLightbox();
+loadAll();
+</script>
+</body>
+</html>
