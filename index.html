@@ -309,8 +309,8 @@ const SCORES = [
   {val:4, label:'Bueno'},
   {val:5, label:'Excelente'}
 ];
-const MAX_PHOTOS = 8;
-const APP_VERSION = "v2.1 (Firebase Storage) · 19-08-2026";
+const MAX_PHOTOS = 12;
+const APP_VERSION = "v2.2 · 19-08-2026";
 let currentPhotos = [];
 
 let state = {
@@ -791,8 +791,12 @@ function renderForm(existingRec){
     <div class="field">
       <label>Fotos de la unidad (opcional, máx. ${MAX_PHOTOS})</label>
       <div id="photos-grid" style="margin-bottom:8px;">${photosGridHtml()}</div>
-      <input type="file" id="foto-input" accept="image/*" capture="environment" multiple style="display:none;">
-      <button type="button" class="btn secondary small" data-action="add-photo">📷 Agregar foto</button>
+      <input type="file" id="foto-input-camera" accept="image/*" capture="environment" style="display:none;">
+      <input type="file" id="foto-input-gallery" accept="image/*" multiple style="display:none;">
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn secondary small" style="flex:1;" data-action="add-photo-camera">📷 Tomar foto</button>
+        <button type="button" class="btn secondary small" style="flex:1;" data-action="add-photo-gallery">🖼️ Elegir de galería</button>
+      </div>
     </div>
 
     <div class="checkbox-row">
@@ -850,17 +854,22 @@ function compressImage(file, maxDim=800, quality=0.5){
 }
 
 async function handlePhotoFiles(e){
-  const files = Array.from(e.target.files || []);
-  if(files.length === 0) return;
+  const rawFiles = Array.from(e.target.files || []);
+  if(rawFiles.length === 0) return;
+  const files = rawFiles.filter(f => f.type && f.type.startsWith('image/'));
+  if(files.length < rawFiles.length){
+    toast(`${rawFiles.length - files.length} archivo(s) ignorado(s) por no ser imágenes.`);
+  }
+  if(files.length === 0){ e.target.value = ''; return; }
   const remaining = MAX_PHOTOS - currentPhotos.length;
   if(remaining <= 0){ toast(`Máximo ${MAX_PHOTOS} fotos por unidad.`); e.target.value=''; return; }
   const toProcess = files.slice(0, remaining);
-  if(files.length > toProcess.length){ toast(`Solo se procesan ${toProcess.length} (máximo ${MAX_PHOTOS} fotos).`); }
+  if(files.length > toProcess.length){ toast(`Solo se procesan ${toProcess.length} (quedaban ${remaining} lugares disponibles de ${MAX_PHOTOS}).`); }
   const unitId = state.detailId;
   toast('Subiendo foto(s)…');
   for(const f of toProcess){
     try{
-      const dataUrl = await compressImage(f, 1400, 0.78);
+      const dataUrl = await compressImage(f, 1280, 0.70);
       const uploaded = await uploadPhoto(dataUrl, unitId);
       currentPhotos.push(uploaded);
       const grid = document.getElementById('photos-grid');
@@ -908,10 +917,10 @@ function desvioCardHtml(i, d){
 }
 
 function attachFormHandlers(){
-  const fotoInput = document.getElementById('foto-input');
-  if(fotoInput){
-    fotoInput.onchange = handlePhotoFiles;
-  }
+  const fotoInputCamera = document.getElementById('foto-input-camera');
+  if(fotoInputCamera){ fotoInputCamera.onchange = handlePhotoFiles; }
+  const fotoInputGallery = document.getElementById('foto-input-gallery');
+  if(fotoInputGallery){ fotoInputGallery.onchange = handlePhotoFiles; }
 
   const scoreOpts = document.querySelectorAll('.score-opt');
   scoreOpts.forEach(opt => {
@@ -1078,8 +1087,12 @@ document.addEventListener('click', async (e)=>{
   else if(action === 'export'){ exportCSV(); }
   else if(action === 'filter-taller'){ state.filterTaller = el.dataset.val; render(); }
   else if(action === 'filter-linea'){ state.filterLinea = el.dataset.val; render(); }
-  else if(action === 'add-photo'){
-    const fi = document.getElementById('foto-input');
+  else if(action === 'add-photo-camera'){
+    const fi = document.getElementById('foto-input-camera');
+    if(fi) fi.click();
+  }
+  else if(action === 'add-photo-gallery'){
+    const fi = document.getElementById('foto-input-gallery');
     if(fi) fi.click();
   }
   else if(action === 'rm-photo'){
