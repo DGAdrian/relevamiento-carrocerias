@@ -232,6 +232,7 @@
     <img id="lightbox-img" src="" style="max-width:94vw; max-height:88vh; object-fit:contain; border-radius:4px; touch-action:none; user-select:none; will-change:transform;">
   </div>
   <button id="lightbox-next" style="display:none; position:absolute; right:2px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text); opacity:.75; width:34px; height:56px; font-size:26px; cursor:pointer; z-index:2; text-shadow:0 1px 5px rgba(0,0,0,.8);">›</button>
+  <div id="lightbox-info" style="display:none; position:absolute; bottom:0; left:0; right:0; background:linear-gradient(180deg, rgba(18,22,26,0), rgba(18,22,26,.97) 30%); padding:26px 20px 18px 20px; z-index:2;"></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -311,9 +312,17 @@ const SCORES = [
   {val:4, label:'Bueno'},
   {val:5, label:'Excelente'}
 ];
-const MAX_PHOTOS = 12;
-const APP_VERSION = "v2.3 · 19-08-2026";
+const MAX_PHOTOS = 13;
+const APP_VERSION = "v2.5 · 19-08-2026";
 let currentPhotos = [];
+let newlyUploadedPaths = new Set();
+let pendingDeletePaths = [];
+
+function getTotalPhotoCount(){
+  let count = currentPhotos.length;
+  document.querySelectorAll('.desvio-card .f-foto-url').forEach(inp => { if(inp.value) count++; });
+  return count;
+}
 
 let state = {
   screen: 'loading', // loading | setup | dashboard | detail
@@ -407,20 +416,40 @@ function applyZoomTransform(animated){
   img.style.transform = `translate(${lbTx}px, ${lbTy}px) scale(${lbScale})`;
 }
 
-function openLightbox(photos, idx){
-  if(!photos || photos.length === 0) return;
-  lightboxPhotos = photos;
+function openLightbox(entries, idx){
+  if(!entries || entries.length === 0) return;
+  lightboxPhotos = entries;
   lightboxIndex = idx;
   renderLightbox();
   document.getElementById('lightbox-overlay').style.display = 'flex';
 }
 function renderLightbox(){
   resetZoom();
-  document.getElementById('lightbox-img').src = lightboxPhotos[lightboxIndex];
+  const entry = lightboxPhotos[lightboxIndex];
+  const img = document.getElementById('lightbox-img');
+  img.src = entry.url;
   document.getElementById('lightbox-counter').textContent = lightboxPhotos.length > 1 ? `${lightboxIndex+1} / ${lightboxPhotos.length}` : '';
   const multi = lightboxPhotos.length > 1;
   document.getElementById('lightbox-prev').style.display = multi ? 'flex' : 'none';
   document.getElementById('lightbox-next').style.display = multi ? 'flex' : 'none';
+
+  const infoBox = document.getElementById('lightbox-info');
+  if(entry.info && (entry.info.zona || entry.info.tipo || entry.info.observaciones)){
+    const sevClass = (entry.info.severidad||'').toLowerCase();
+    infoBox.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;">
+        <b style="font-size:13.5px; color:var(--text);">${escapeHtml(entry.info.zona||'—')}</b>
+        ${entry.info.severidad ? `<span class="badge ${sevClass}">${escapeHtml(entry.info.severidad)}</span>` : ''}
+      </div>
+      <div style="font-size:12.5px; color:var(--text-dim);">${escapeHtml(entry.info.tipo||'')}</div>
+      ${entry.info.observaciones ? `<div style="font-size:12px; color:var(--text-dim); margin-top:4px;">${escapeHtml(entry.info.observaciones)}</div>` : ''}
+    `;
+    infoBox.style.display = 'block';
+    img.style.maxHeight = '68vh';
+  } else {
+    infoBox.style.display = 'none';
+    img.style.maxHeight = '88vh';
+  }
 }
 function closeLightbox(){
   document.getElementById('lightbox-overlay').style.display = 'none';
@@ -813,7 +842,7 @@ async function renderDetail(){
       </div>
       ${scoreInfo ? `<div class="score-display score-pill s${scoreInfo.val}">Puntaje general: ${scoreInfo.val}/5 · ${escapeHtml(scoreInfo.label)}</div>` : ''}
       ${rec.fotos && rec.fotos.length ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">${rec.fotos.map((p,i) => `<img src="${photoUrl(p)}" data-action="view-photo" data-idx="${i}" data-source="record" style="width:90px; height:90px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer;">`).join('')}</div>` : ''}
-      ${rec.desvios && rec.desvios.length ? rec.desvios.map(d => `
+      ${rec.desvios && rec.desvios.length ? rec.desvios.map((d,di) => `
         <div class="summary-block">
           <div class="row1">
             <b style="font-size:13.5px;">${escapeHtml(d.zona)}</b>
@@ -821,6 +850,7 @@ async function renderDetail(){
           </div>
           <div style="font-size:13px; color:var(--text-dim);">${escapeHtml(d.tipo)}</div>
           ${d.observaciones ? `<div class="obs">${escapeHtml(d.observaciones)}</div>` : ''}
+          ${d.foto && photoUrl(d.foto) ? `<img src="${photoUrl(d.foto)}" data-action="view-photo-record-desvio" data-di="${di}" style="width:70px; height:70px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer; margin-top:8px;">` : ''}
         </div>
       `).join('') : `<div class="empty-state"><div class="big">✅</div><p>No se detectaron desvíos en esta unidad.</p></div>`}
       <button class="btn secondary" style="margin-top:10px;" data-action="edit-unit">Editar relevamiento</button>
@@ -871,6 +901,8 @@ function renderForm(existingRec){
   const usuarioVal = (existingRec && existingRec.usuario) ? existingRec.usuario : state.lastUser;
   const scoreVal = existingRec ? existingRec.puntaje : null;
   currentPhotos = (existingRec && existingRec.fotos) ? existingRec.fotos.slice() : [];
+  newlyUploadedPaths = new Set();
+  pendingDeletePaths = [];
 
   return `
     <div class="score-section">
@@ -887,7 +919,8 @@ function renderForm(existingRec){
     </div>
 
     <div class="field">
-      <label>Fotos de la unidad (opcional, máx. ${MAX_PHOTOS})</label>
+      <label>Fotos generales de la unidad (opcional)</label>
+      <div style="font-size:11px; color:var(--text-dim); margin-bottom:8px;">Compartido con las fotos de cada desvío — máximo ${MAX_PHOTOS} en total.</div>
       <div id="photos-grid" style="margin-bottom:8px;">${photosGridHtml()}</div>
       <input type="file" id="foto-input-camera" accept="image/*" capture="environment" style="display:none;">
       <input type="file" id="foto-input-gallery" accept="image/*" multiple style="display:none;">
@@ -959,16 +992,17 @@ async function handlePhotoFiles(e){
     toast(`${rawFiles.length - files.length} archivo(s) ignorado(s) por no ser imágenes.`);
   }
   if(files.length === 0){ e.target.value = ''; return; }
-  const remaining = MAX_PHOTOS - currentPhotos.length;
-  if(remaining <= 0){ toast(`Máximo ${MAX_PHOTOS} fotos por unidad.`); e.target.value=''; return; }
+  const remaining = MAX_PHOTOS - getTotalPhotoCount();
+  if(remaining <= 0){ toast(`Máximo ${MAX_PHOTOS} fotos en total (generales + desvíos) por unidad.`); e.target.value=''; return; }
   const toProcess = files.slice(0, remaining);
-  if(files.length > toProcess.length){ toast(`Solo se procesan ${toProcess.length} (quedaban ${remaining} lugares disponibles de ${MAX_PHOTOS}).`); }
+  if(files.length > toProcess.length){ toast(`Solo se procesan ${toProcess.length} (quedaban ${remaining} lugares disponibles de ${MAX_PHOTOS} en total).`); }
   const unitId = state.detailId;
   toast('Subiendo foto(s)…');
   for(const f of toProcess){
     try{
       const dataUrl = await compressImage(f, 1280, 0.70);
       const uploaded = await uploadPhoto(dataUrl, unitId);
+      newlyUploadedPaths.add(uploaded.path);
       currentPhotos.push(uploaded);
       const grid = document.getElementById('photos-grid');
       if(grid) grid.innerHTML = photosGridHtml();
@@ -977,8 +1011,31 @@ async function handlePhotoFiles(e){
   e.target.value = '';
 }
 
+function desvioPhotoSlotHtml(foto){
+  if(foto && photoUrl(foto)){
+    return `
+      <div style="position:relative; width:74px; height:74px;">
+        <img class="desvio-foto-img" src="${photoUrl(foto)}" style="width:100%; height:100%; object-fit:cover; border-radius:8px; border:1px solid var(--border); display:block; cursor:pointer;">
+        <button type="button" class="rm-desvio-foto" style="position:absolute; top:-6px; right:-6px; background:var(--red-dim); color:var(--red); border:1px solid #5A332E; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; line-height:1;">✕</button>
+        <input type="hidden" class="f-foto-url" value="${photoUrl(foto)}">
+        <input type="hidden" class="f-foto-path" value="${foto.path||''}">
+      </div>
+    `;
+  }
+  return `
+    <div style="display:flex; gap:6px;">
+      <button type="button" class="foto-cam-btn btn secondary small">📷</button>
+      <button type="button" class="foto-gal-btn btn secondary small">🖼️</button>
+      <input type="file" class="f-foto-input-camera" accept="image/*" capture="environment" style="display:none;">
+      <input type="file" class="f-foto-input-gallery" accept="image/*" style="display:none;">
+      <input type="hidden" class="f-foto-url" value="">
+      <input type="hidden" class="f-foto-path" value="">
+    </div>
+  `;
+}
+
 function desvioCardHtml(i, d){
-  d = d || {zona:'', tipo:'', severidad:'', observaciones:''};
+  d = d || {zona:'', tipo:'', severidad:'', observaciones:'', foto:null};
   return `
     <div class="desvio-card">
       <button type="button" class="rm" data-action="rm-desvio">✕</button>
@@ -1005,6 +1062,10 @@ function desvioCardHtml(i, d){
           <div class="sev-opt sel-grave ${d.severidad==='Grave'?'on':''}" data-sev="Grave">Grave</div>
         </div>
         <input type="hidden" class="f-severidad" value="${escapeHtml(d.severidad||'')}">
+      </div>
+      <div class="field">
+        <label>Foto del desvío (opcional, máx. 1)</label>
+        <div class="desvio-photo-wrap">${desvioPhotoSlotHtml(d.foto)}</div>
       </div>
       <div class="field" style="margin-bottom:0;">
         <label>Observaciones</label>
@@ -1057,7 +1118,14 @@ function attachFormHandlers(){
 
 function bindCard(card){
   const rm = card.querySelector('[data-action="rm-desvio"]');
-  rm.onclick = ()=>{ card.remove(); };
+  rm.onclick = ()=>{
+    const path = card.querySelector('.f-foto-path')?.value;
+    if(path){
+      if(newlyUploadedPaths.has(path)){ deletePhotoFile(path); newlyUploadedPaths.delete(path); }
+      else { pendingDeletePaths.push(path); }
+    }
+    card.remove();
+  };
   Array.from(card.querySelectorAll('.sev-opt')).forEach(opt=>{
     opt.onclick = ()=>{
       Array.from(card.querySelectorAll('.sev-opt')).forEach(o=>o.classList.remove('on'));
@@ -1065,6 +1133,84 @@ function bindCard(card){
       card.querySelector('.f-severidad').value = opt.dataset.sev;
     };
   });
+  bindDesvioPhotoSlot(card);
+}
+
+function bindDesvioPhotoSlot(card){
+  const wrap = card.querySelector('.desvio-photo-wrap');
+  if(!wrap) return;
+  const rmBtn = wrap.querySelector('.rm-desvio-foto');
+  const img = wrap.querySelector('.desvio-foto-img');
+  const camBtn = wrap.querySelector('.foto-cam-btn');
+  const galBtn = wrap.querySelector('.foto-gal-btn');
+  const camInput = wrap.querySelector('.f-foto-input-camera');
+  const galInput = wrap.querySelector('.f-foto-input-gallery');
+
+  if(img){
+    img.onclick = () => {
+      const url = wrap.querySelector('.f-foto-url').value;
+      if(!url) return;
+      const entries = buildCombinedPhotoEntriesForm();
+      const startIdx = Math.max(0, entries.findIndex(en => en.url === url));
+      openLightbox(entries, startIdx);
+    };
+  }
+  if(rmBtn){
+    rmBtn.onclick = () => {
+      const path = wrap.querySelector('.f-foto-path').value;
+      if(path){
+        if(newlyUploadedPaths.has(path)){ deletePhotoFile(path); newlyUploadedPaths.delete(path); }
+        else { pendingDeletePaths.push(path); }
+      }
+      wrap.innerHTML = desvioPhotoSlotHtml(null);
+      bindDesvioPhotoSlot(card);
+    };
+  }
+  async function handleFile(file){
+    if(!file) return;
+    if(!file.type || !file.type.startsWith('image/')){ toast('Solo se permiten archivos de imagen.'); return; }
+    if(getTotalPhotoCount() >= MAX_PHOTOS){ toast(`Máximo ${MAX_PHOTOS} fotos en total (generales + desvíos) por unidad.`); return; }
+    toast('Subiendo foto…');
+    try{
+      const dataUrl = await compressImage(file, 1280, 0.70);
+      const uploaded = await uploadPhoto(dataUrl, state.detailId);
+      newlyUploadedPaths.add(uploaded.path);
+      wrap.innerHTML = desvioPhotoSlotHtml(uploaded);
+      bindDesvioPhotoSlot(card);
+    }catch(err){ console.error(err); toast('No se pudo subir la foto.'); }
+  }
+  if(camBtn) camBtn.onclick = () => camInput.click();
+  if(galBtn) galBtn.onclick = () => galInput.click();
+  if(camInput) camInput.onchange = (e) => { const f = e.target.files[0]; e.target.value=''; handleFile(f); };
+  if(galInput) galInput.onchange = (e) => { const f = e.target.files[0]; e.target.value=''; handleFile(f); };
+}
+
+function buildCombinedPhotoEntriesForm(){
+  const entries = currentPhotos.map(p => ({ url: photoUrl(p), info: null }));
+  document.querySelectorAll('.desvio-card').forEach(card => {
+    const url = card.querySelector('.f-foto-url')?.value;
+    if(url){
+      entries.push({
+        url,
+        info: {
+          zona: card.querySelector('.f-zona').value,
+          tipo: card.querySelector('.f-tipo').value,
+          severidad: card.querySelector('.f-severidad').value,
+          observaciones: card.querySelector('.f-obs').value
+        }
+      });
+    }
+  });
+  return entries;
+}
+function buildCombinedPhotoEntriesRecord(rec){
+  const entries = (rec.fotos||[]).map(p => ({ url: photoUrl(p), info: null }));
+  (rec.desvios||[]).forEach(d => {
+    if(d.foto && photoUrl(d.foto)){
+      entries.push({ url: photoUrl(d.foto), info: { zona:d.zona, tipo:d.tipo, severidad:d.severidad, observaciones:d.observaciones } });
+    }
+  });
+  return entries;
 }
 
 async function submitForm(){
@@ -1085,7 +1231,10 @@ async function submitForm(){
       const sev = c.querySelector('.f-severidad').value;
       const obs = c.querySelector('.f-obs').value.trim();
       if(!zona || !tipo || !sev){ toast('Completá zona, tipo y severidad en todos los desvíos.'); return; }
-      desvios.push({zona, tipo, severidad:sev, observaciones:obs});
+      const fotoUrl_ = c.querySelector('.f-foto-url').value;
+      const fotoPath_ = c.querySelector('.f-foto-path').value;
+      const foto = fotoUrl_ ? { url: fotoUrl_, path: fotoPath_ } : null;
+      desvios.push({zona, tipo, severidad:sev, observaciones:obs, foto});
     }
   }
 
@@ -1094,6 +1243,9 @@ async function submitForm(){
   btn.disabled = true; btn.textContent = 'Guardando…';
   try{
     await dbSetUnit(id, record);
+    for(const p of pendingDeletePaths){ deletePhotoFile(p); }
+    pendingDeletePaths = [];
+    newlyUploadedPaths = new Set();
     try{ localStorage.setItem('relevamiento-last-user', usuario); }catch(e){}
     state.completedSet.add(id);
     state.recordsCache[id] = record;
@@ -1129,16 +1281,16 @@ async function openUnit(id){
 async function exportCSV(){
   toast('Preparando CSV…');
   const units = getDoneUnits();
-  let rows = [['unidad','taller','linea','anio_modelo','modelo','puntaje','usuario','fecha','zona','tipo_desvio','severidad','observaciones']];
+  let rows = [['unidad','taller','linea','anio_modelo','modelo','puntaje','usuario','fecha','zona','tipo_desvio','severidad','observaciones','foto_desvio_url']];
   for(const u of units){
     try{
       const rec = await dbGetUnit(u.id);
       if(!rec) continue;
       if(!rec.desvios || rec.desvios.length===0){
-        rows.push([u.id, u.taller, u.linea, u.anio, u.modelo, rec.puntaje||'', rec.usuario, rec.fecha, '', 'SIN DESVIOS', '', '']);
+        rows.push([u.id, u.taller, u.linea, u.anio, u.modelo, rec.puntaje||'', rec.usuario, rec.fecha, '', 'SIN DESVIOS', '', '', '']);
       } else {
         rec.desvios.forEach(d=>{
-          rows.push([u.id, u.taller, u.linea, u.anio, u.modelo, rec.puntaje||'', rec.usuario, rec.fecha, d.zona, d.tipo, d.severidad, (d.observaciones||'').replace(/\n/g,' ')]);
+          rows.push([u.id, u.taller, u.linea, u.anio, u.modelo, rec.puntaje||'', rec.usuario, rec.fecha, d.zona, d.tipo, d.severidad, (d.observaciones||'').replace(/\n/g,' '), photoUrl(d.foto)]);
         });
       }
     }catch(e){}
@@ -1180,7 +1332,14 @@ document.addEventListener('click', async (e)=>{
 
   if(action === 'tab'){ state.tab = el.dataset.tab; state.search=''; render(); }
   else if(action === 'open'){ openUnit(el.dataset.id); }
-  else if(action === 'back'){ state.screen='dashboard'; render(); }
+  else if(action === 'back'){
+    if(newlyUploadedPaths && newlyUploadedPaths.size){
+      newlyUploadedPaths.forEach(p => deletePhotoFile(p));
+      newlyUploadedPaths = new Set();
+    }
+    pendingDeletePaths = [];
+    state.screen='dashboard'; render();
+  }
   else if(action === 'refresh'){ app.innerHTML = '<div class="loading">Actualizando…</div>'; await loadAll(); }
   else if(action === 'export'){ exportCSV(); }
   else if(action === 'filter-taller'){ state.filterTaller = el.dataset.val; render(); }
@@ -1199,15 +1358,36 @@ document.addEventListener('click', async (e)=>{
     const grid = document.getElementById('photos-grid');
     if(grid) grid.innerHTML = photosGridHtml();
     if(removed && typeof removed === 'object' && removed.path){
-      deletePhotoFile(removed.path);
+      if(newlyUploadedPaths.has(removed.path)){
+        deletePhotoFile(removed.path);
+        newlyUploadedPaths.delete(removed.path);
+      } else {
+        pendingDeletePaths.push(removed.path);
+      }
     }
   }
   else if(action === 'view-photo'){
     const idx = parseInt(el.dataset.idx, 10);
     const source = el.dataset.source;
-    const rawPhotos = source === 'current' ? currentPhotos : (state.detailRecord ? state.detailRecord.fotos : []);
-    const photos = (rawPhotos || []).map(photoUrl);
-    openLightbox(photos, idx);
+    let entries, targetUrl;
+    if(source === 'current'){
+      entries = buildCombinedPhotoEntriesForm();
+      targetUrl = photoUrl(currentPhotos[idx]);
+    } else {
+      const rec = state.detailRecord || {};
+      entries = buildCombinedPhotoEntriesRecord(rec);
+      targetUrl = photoUrl((rec.fotos||[])[idx]);
+    }
+    const startIdx = Math.max(0, entries.findIndex(en => en.url === targetUrl));
+    openLightbox(entries, startIdx);
+  }
+  else if(action === 'view-photo-record-desvio'){
+    const di = parseInt(el.dataset.di, 10);
+    const rec = state.detailRecord || {};
+    const entries = buildCombinedPhotoEntriesRecord(rec);
+    const targetUrl = photoUrl((rec.desvios||[])[di] ? rec.desvios[di].foto : null);
+    const startIdx = Math.max(0, entries.findIndex(en => en.url === targetUrl));
+    openLightbox(entries, startIdx);
   }
   else if(action === 'add-units'){
     const ta = document.getElementById('add-textarea');
