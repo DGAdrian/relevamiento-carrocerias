@@ -224,12 +224,14 @@
   </div>
 </div>
 
-<div id="lightbox-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:250; align-items:center; justify-content:center; padding:0;">
-  <button id="lightbox-close" style="position:absolute; top:16px; right:16px; background:var(--surface2); border:1px solid var(--border); color:var(--text); width:38px; height:38px; border-radius:8px; font-size:18px; cursor:pointer; z-index:2;">✕</button>
-  <div id="lightbox-counter" style="position:absolute; top:22px; left:16px; color:var(--text-dim); font-size:13px; font-family:'JetBrains Mono',monospace;"></div>
-  <button id="lightbox-prev" style="display:none; position:absolute; left:8px; top:50%; transform:translateY(-50%); background:var(--surface2); border:1px solid var(--border); color:var(--text); width:42px; height:42px; border-radius:50%; font-size:18px; cursor:pointer; z-index:2;">‹</button>
-  <img id="lightbox-img" src="" style="max-width:94vw; max-height:88vh; object-fit:contain; border-radius:4px;">
-  <button id="lightbox-next" style="display:none; position:absolute; right:8px; top:50%; transform:translateY(-50%); background:var(--surface2); border:1px solid var(--border); color:var(--text); width:42px; height:42px; border-radius:50%; font-size:18px; cursor:pointer; z-index:2;">›</button>
+<div id="lightbox-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:250; align-items:center; justify-content:center; padding:0; overflow:hidden; touch-action:none;">
+  <button id="lightbox-close" style="position:absolute; top:16px; right:16px; background:var(--surface2); border:1px solid var(--border); color:var(--text); width:38px; height:38px; border-radius:8px; font-size:18px; cursor:pointer; z-index:3;">✕</button>
+  <div id="lightbox-counter" style="position:absolute; top:22px; left:16px; color:var(--text-dim); font-size:13px; font-family:'JetBrains Mono',monospace; z-index:3;"></div>
+  <button id="lightbox-prev" style="display:none; position:absolute; left:2px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text); opacity:.75; width:34px; height:56px; font-size:26px; cursor:pointer; z-index:2; text-shadow:0 1px 5px rgba(0,0,0,.8);">‹</button>
+  <div id="lightbox-img-wrap" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+    <img id="lightbox-img" src="" style="max-width:94vw; max-height:88vh; object-fit:contain; border-radius:4px; touch-action:none; user-select:none; will-change:transform;">
+  </div>
+  <button id="lightbox-next" style="display:none; position:absolute; right:2px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text); opacity:.75; width:34px; height:56px; font-size:26px; cursor:pointer; z-index:2; text-shadow:0 1px 5px rgba(0,0,0,.8);">›</button>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -310,7 +312,7 @@ const SCORES = [
   {val:5, label:'Excelente'}
 ];
 const MAX_PHOTOS = 12;
-const APP_VERSION = "v2.2 · 19-08-2026";
+const APP_VERSION = "v2.3 · 19-08-2026";
 let currentPhotos = [];
 
 let state = {
@@ -393,6 +395,18 @@ function closeSecurityModal(result){
 }
 let lightboxPhotos = [];
 let lightboxIndex = 0;
+let lbScale = 1, lbTx = 0, lbTy = 0;
+
+function resetZoom(){
+  lbScale = 1; lbTx = 0; lbTy = 0;
+  applyZoomTransform(false);
+}
+function applyZoomTransform(animated){
+  const img = document.getElementById('lightbox-img');
+  img.style.transition = animated ? 'transform .15s ease-out' : 'none';
+  img.style.transform = `translate(${lbTx}px, ${lbTy}px) scale(${lbScale})`;
+}
+
 function openLightbox(photos, idx){
   if(!photos || photos.length === 0) return;
   lightboxPhotos = photos;
@@ -401,6 +415,7 @@ function openLightbox(photos, idx){
   document.getElementById('lightbox-overlay').style.display = 'flex';
 }
 function renderLightbox(){
+  resetZoom();
   document.getElementById('lightbox-img').src = lightboxPhotos[lightboxIndex];
   document.getElementById('lightbox-counter').textContent = lightboxPhotos.length > 1 ? `${lightboxIndex+1} / ${lightboxPhotos.length}` : '';
   const multi = lightboxPhotos.length > 1;
@@ -409,9 +424,11 @@ function renderLightbox(){
 }
 function closeLightbox(){
   document.getElementById('lightbox-overlay').style.display = 'none';
+  resetZoom();
 }
 function initLightbox(){
   const overlay = document.getElementById('lightbox-overlay');
+  const img = document.getElementById('lightbox-img');
   document.getElementById('lightbox-close').onclick = closeLightbox;
   document.getElementById('lightbox-prev').onclick = () => {
     lightboxIndex = (lightboxIndex - 1 + lightboxPhotos.length) % lightboxPhotos.length;
@@ -427,6 +444,87 @@ function initLightbox(){
     if(e.key === 'Escape') closeLightbox();
     if(e.key === 'ArrowLeft') document.getElementById('lightbox-prev').click();
     if(e.key === 'ArrowRight') document.getElementById('lightbox-next').click();
+  });
+
+  // --- Zoom con pellizco (pinch), arrastre (pan) y deslizar (swipe) para navegar ---
+  const MAX_ZOOM = 4;
+  let pinchStartDist = null, pinchStartScale = 1, isPinching = false;
+  let panStart = null;
+  let swipeStartX = null, swipeStartY = null, swipeStartTime = 0;
+  let lastTapTime = 0;
+
+  function touchDist(t1, t2){ return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); }
+
+  img.addEventListener('touchstart', (e) => {
+    if(e.touches.length === 2){
+      isPinching = true;
+      pinchStartDist = touchDist(e.touches[0], e.touches[1]);
+      pinchStartScale = lbScale;
+    } else if(e.touches.length === 1){
+      if(lbScale > 1.01){
+        panStart = { x:e.touches[0].clientX, y:e.touches[0].clientY, tx:lbTx, ty:lbTy };
+      } else {
+        swipeStartX = e.touches[0].clientX;
+        swipeStartY = e.touches[0].clientY;
+        swipeStartTime = Date.now();
+      }
+    }
+  }, {passive:true});
+
+  img.addEventListener('touchmove', (e) => {
+    if(e.touches.length === 2 && isPinching){
+      e.preventDefault();
+      const newDist = touchDist(e.touches[0], e.touches[1]);
+      lbScale = Math.max(1, Math.min(MAX_ZOOM, pinchStartScale * (newDist / pinchStartDist)));
+      applyZoomTransform(false);
+    } else if(e.touches.length === 1 && panStart){
+      e.preventDefault();
+      lbTx = panStart.tx + (e.touches[0].clientX - panStart.x);
+      lbTy = panStart.ty + (e.touches[0].clientY - panStart.y);
+      applyZoomTransform(false);
+    }
+  }, {passive:false});
+
+  img.addEventListener('touchend', (e) => {
+    if(e.touches.length === 0){
+      if(isPinching){
+        isPinching = false;
+        if(lbScale <= 1.02) resetZoom();
+      } else if(panStart){
+        panStart = null;
+        if(lbScale <= 1.02) resetZoom();
+      } else if(swipeStartX !== null){
+        const touch = e.changedTouches[0];
+        const dx = touch.clientX - swipeStartX;
+        const dy = touch.clientY - swipeStartY;
+        const dt = Date.now() - swipeStartTime;
+        if(lightboxPhotos.length > 1 && Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4 && dt < 600){
+          if(dx < 0) document.getElementById('lightbox-next').click();
+          else document.getElementById('lightbox-prev').click();
+        }
+      }
+      swipeStartX = null; swipeStartY = null;
+
+      const now = Date.now();
+      if(now - lastTapTime < 300){
+        if(lbScale > 1.01){ resetZoom(); }
+        else { lbScale = 2.4; applyZoomTransform(true); }
+      }
+      lastTapTime = now;
+    } else if(e.touches.length === 1 && isPinching){
+      isPinching = false;
+      if(lbScale > 1.01){
+        panStart = { x:e.touches[0].clientX, y:e.touches[0].clientY, tx:lbTx, ty:lbTy };
+      } else {
+        resetZoom();
+      }
+    }
+  }, {passive:true});
+
+  // Doble click en desktop para hacer zoom
+  img.addEventListener('dblclick', () => {
+    if(lbScale > 1.01){ resetZoom(); }
+    else { lbScale = 2.4; applyZoomTransform(true); }
   });
 }
 
