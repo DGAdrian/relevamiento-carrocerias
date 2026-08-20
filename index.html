@@ -313,7 +313,7 @@ const SCORES = [
   {val:5, label:'Excelente'}
 ];
 const MAX_PHOTOS = 13;
-const APP_VERSION = "v2.5 · 19-08-2026";
+const APP_VERSION = "v2.6 · 19-08-2026";
 let currentPhotos = [];
 let newlyUploadedPaths = new Set();
 let pendingDeletePaths = [];
@@ -422,6 +422,7 @@ function openLightbox(entries, idx){
   lightboxIndex = idx;
   renderLightbox();
   document.getElementById('lightbox-overlay').style.display = 'flex';
+  pushLayer('lightbox');
 }
 function renderLightbox(){
   resetZoom();
@@ -451,9 +452,14 @@ function renderLightbox(){
     img.style.maxHeight = '88vh';
   }
 }
-function closeLightbox(){
+function closeLightboxImmediate(){
   document.getElementById('lightbox-overlay').style.display = 'none';
   resetZoom();
+}
+function closeLightbox(){
+  // Disparado por el botón X, el fondo o Escape: sincroniza el historial
+  // (el popstate resultante llamará a closeLightboxImmediate).
+  history.back();
 }
 function initLightbox(){
   const overlay = document.getElementById('lightbox-overlay');
@@ -535,7 +541,7 @@ function initLightbox(){
       swipeStartX = null; swipeStartY = null;
 
       const now = Date.now();
-      if(now - lastTapTime < 300){
+      if(now - lastTapTime < 400){
         if(lbScale > 1.01){ resetZoom(); }
         else { lbScale = 2.4; applyZoomTransform(true); }
       }
@@ -625,6 +631,41 @@ async function ensureRecordsLoaded(ids){
       state.recordsCache[id] = await dbGetUnit(id);
     }catch(e){ state.recordsCache[id] = null; }
   }));
+}
+
+function currentLayer(){
+  const lb = document.getElementById('lightbox-overlay');
+  if(lb && lb.style.display === 'flex') return 'lightbox';
+  if(state.screen === 'detail') return 'detail';
+  return 'dashboard';
+}
+function pushLayer(layer){
+  history.pushState({layer}, '');
+}
+function handlePopState(){
+  const secOverlay = document.getElementById('security-modal-overlay');
+  if(secOverlay && secOverlay.style.display === 'flex'){
+    closeSecurityModal(false);
+    pushLayer(currentLayer());
+    return;
+  }
+  const lbOverlay = document.getElementById('lightbox-overlay');
+  if(lbOverlay && lbOverlay.style.display === 'flex'){
+    closeLightboxImmediate();
+    return;
+  }
+  if(state.screen === 'detail'){
+    if(newlyUploadedPaths && newlyUploadedPaths.size){
+      newlyUploadedPaths.forEach(p => deletePhotoFile(p));
+      newlyUploadedPaths = new Set();
+    }
+    pendingDeletePaths = [];
+    state.screen = 'dashboard';
+    render();
+    return;
+  }
+  // Ya estamos en la pantalla principal: no hacemos nada y dejamos que
+  // el navegador/app maneje el siguiente "atrás" con su comportamiento normal.
 }
 
 function render(){
@@ -777,8 +818,8 @@ function renderDashboard(){
       </div>
       <div class="stats-row">
         <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total</div></div>
-        <div class="stat-card pend"><div class="stat-num">${pendingCount}</div><div class="stat-label">Pendientes</div></div>
-        <div class="stat-card done"><div class="stat-num">${doneCount}</div><div class="stat-label">Relevadas</div></div>
+        <div class="stat-card pend" data-action="tab" data-tab="pending" style="cursor:pointer;"><div class="stat-num">${pendingCount}</div><div class="stat-label">Pendientes</div></div>
+        <div class="stat-card done" data-action="tab" data-tab="done" style="cursor:pointer;"><div class="stat-num">${doneCount}</div><div class="stat-label">Relevadas</div></div>
       </div>
       <div class="tabs">
         <div class="tab ${state.tab==='pending'?'active':''}" data-action="tab" data-tab="pending">Pendientes</div>
@@ -1251,9 +1292,8 @@ async function submitForm(){
     state.recordsCache[id] = record;
     state.lastUser = usuario;
     toast('Relevamiento guardado ✓');
-    state.screen = 'dashboard';
     state.tab = 'pending';
-    render();
+    history.back();
   }catch(e){
     console.error(e);
     toast('Error al guardar. Probá de nuevo.');
@@ -1275,6 +1315,7 @@ async function openUnit(id){
     }catch(e){ state.detailRecord = null; }
   }
   state.screen = 'detail';
+  pushLayer('detail');
   render();
 }
 
@@ -1333,12 +1374,7 @@ document.addEventListener('click', async (e)=>{
   if(action === 'tab'){ state.tab = el.dataset.tab; state.search=''; render(); }
   else if(action === 'open'){ openUnit(el.dataset.id); }
   else if(action === 'back'){
-    if(newlyUploadedPaths && newlyUploadedPaths.size){
-      newlyUploadedPaths.forEach(p => deletePhotoFile(p));
-      newlyUploadedPaths = new Set();
-    }
-    pendingDeletePaths = [];
-    state.screen='dashboard'; render();
+    history.back();
   }
   else if(action === 'refresh'){ app.innerHTML = '<div class="loading">Actualizando…</div>'; await loadAll(); }
   else if(action === 'export'){ exportCSV(); }
@@ -1397,6 +1433,7 @@ document.addEventListener('click', async (e)=>{
       errBox.innerHTML = `<div class="error-box"><b>${errors.length} línea(s) con problemas:</b><br>${errors.slice(0,15).map(x=>escapeHtml(x)).join('<br>')}</div>`;
     } else { errBox.innerHTML = ''; }
     if(valid.length === 0){ toast('No hay unidades válidas para agregar.'); return; }
+    if(!(await requestSecurityCode('Para agregar unidades a la flota, ingresá el código de seguridad:'))) return;
     const dedup = {};
     state.masterList.forEach(u => dedup[u.id] = u);
     let addedCount = 0, updatedCount = 0;
@@ -1418,9 +1455,8 @@ document.addEventListener('click', async (e)=>{
       state.completedSet.delete(id);
       delete state.recordsCache[id];
       toast('Relevamiento eliminado. La unidad volvió a pendientes.');
-      state.screen = 'dashboard';
       state.tab = 'pending';
-      render();
+      history.back();
     }catch(e){ toast('Error al eliminar. Probá de nuevo.'); }
   }
   else if(action === 'delete-unit'){
@@ -1438,9 +1474,8 @@ document.addEventListener('click', async (e)=>{
       state.completedSet.delete(id);
       delete state.recordsCache[id];
       toast(`Unidad ${id} eliminada de la flota.`);
-      state.screen = 'dashboard';
       state.tab = 'pending';
-      render();
+      history.back();
     }catch(e){ toast('Error al eliminar la unidad.'); }
   }
   else if(action === 'wipe'){
@@ -1458,6 +1493,8 @@ document.addEventListener('click', async (e)=>{
 
 initSecurityModal();
 initLightbox();
+try{ history.replaceState({layer:'dashboard'}, ''); }catch(e){}
+window.addEventListener('popstate', handlePopState);
 loadAll();
 </script>
 </body>
